@@ -7,6 +7,15 @@
 
 struct termios orig_termios;
 
+
+void die(const char *s){
+  //PERROR  first prints string passed to it. then looks at errno var and prints
+  //        a descriptive err msg. most c libs funcs that fail set errno
+  perror(s);
+  //exit program with status 1 (indicated failure)
+  exit(1);
+}
+
 void disableRawMode(){	
   //TCSAFLUSH will discard any unread input before applying changes.
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);

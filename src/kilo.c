@@ -22,9 +22,18 @@ void enableRawMode() {
 
   struct termios raw = orig_termios;
   //FLAGSET = FLAGS AND NOT (X Y Z)
+  //ICRNL FLAG: carriage return new line flag ctrl-m now 13 
+  //IXON FLAG: suspend software control signals ctrl-s/-q
+  raw.c_iflag &= ~(ICRNL | IXON);
+  //OPOST FLAG: output processing 
+  // e.g. by default it a `\n` new line is processed as a `\r\n` so the new line
+  //      begins at start of next line 
+  raw.c_oflag &= ~(OPOST);
   //ECHO FLAG: print input to terminal
   //ICANNON FLAG: read line by line not byte by byte
-  raw.c_lflag &= ~(ECHO | ICANON);
+  //IEXTEN FLAG: disable ctrl-v 
+  //ISIS FLAG: suspend ctrl-c/-z sending signal inputs
+  raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
 
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }

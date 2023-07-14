@@ -34,6 +34,7 @@ int main(){
   
   char c;
   while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q'){
+    // iscntrl() test if char is (non printable) control char.
     if(iscntrl(c)) {
       printf("%d\n", c);
     } else {

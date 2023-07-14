@@ -18,12 +18,14 @@ void die(const char *s){
 
 void disableRawMode(){	
   //TCSAFLUSH will discard any unread input before applying changes.
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1) 
+    die("tcsetattr");
 }
 
 void enableRawMode() {
  
-  tcgetattr(STDIN_FILENO, &orig_termios);  
+  if (tcgetattr(STDIN_FILENO, &orig_termios) == -1)
+    die("tcgetattr");  
   //atext comes from <stdlib.h>.
   //use it to register our function to be called automatically when the
   //program exits.
@@ -54,7 +56,8 @@ void enableRawMode() {
   raw.c_cc[VMIN] = 0;
   raw.c_cc[VTIME] = 1;
 
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
+    die("tcsetattr");
 }
 
 int main(){
@@ -63,7 +66,8 @@ int main(){
   
   while (1){
     char c = '\0';
-    read(STDIN_FILENO, &c, 1); 
+    if (read(STDIN_FILENO, &c, 1) == -1)
+      die("read"); 
     // iscntrl() test if char is (non printable) control char.
     if(iscntrl(c)) {
       printf("%d\n", c);

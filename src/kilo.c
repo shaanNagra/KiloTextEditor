@@ -80,37 +80,71 @@ void enableRawMode() {
   raw.c_oflag &= ~(OPOST);
   raw.c_cflag &= ~(CS8);
   raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
-
-
-  //Timeout read()
-  raw.c_cc[VMIN] = 0;
-  raw.c_cc[VTIME] = 1;
+ 
+  raw.c_cc[VMIN] = 0; //min number of input bytes before read() returns.
+  raw.c_cc[VTIME] = 1;//max time read() waits before returning.
 
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1)
     die("tcsetattr");
 }
 
+char editorReadKey(){
+  int nread;
+  char c;
+  while ((nread = read(STDIN_FILENO, &c, 1)) != 1){
+    if (nread == -1 && errno != EAGAIN){
+      die("read"); 
+    } 
+  }
+  return c;
+}
+
+/*** output ***/
+
+void editorDrawRows(){
+  int y;
+  for (y = 0; y < 24; y++){
+    write(STDOUT_FILENO, "~\r\n", 3);
+  }
+}
+
+void editorRefreshScreen(){
+  /*
+   * write() and STDOUT_FILENO come from <unistd.h>
+   * we write 4 bytes out to terminal. \1xb (escape char) followed by [ char.
+   * 2J is the J command (erase) with argument value 2 (whole screen).
+   */
+  write(STDOUT_FILENO, "\x1b[2J", 4);
+  write(STDOUT_FILENO, "\x1b[H", 3);
+
+  editorDrawRows();
+
+  write(STDOUT_FILENO, "\x1b[H", 3);
+}
+
+/*** input ***/
+
+void editorProcessKeypress(){
+  char c = editorReadKey();
+
+  switch (c) {
+    case CTRL_KEY('q'):
+      write(STDOUT_FILENO, "\x1b[2J", 4);
+      write(STDOUT_FILENO, "\x1b[H", 3);
+      exit(0);
+      break;
+  }
+}
+
 /*** init ***/
 
-int main(){
-  enableRawMode();
-  
+int main(){ 
+  enableRawMode(); 
   
   while (1){
-    char c = '\0';
-    //CHECK errno != EAGAIN as Cygwin returns -1 when read times out
-    //  with errno of EAGAIN
-    if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN)
-      die("read"); 
-    // iscntrl() test if char is (non printable) control char.
-    if(iscntrl(c)) {
-      printf("%d\n", c);
-    } else {
-      printf("%d ('%c')\n", c, c);
-    }
-    if(c == CTRL_KEY('q')) break;
+    editorRefreshScreen();
+    editorProcessKeypress();
   }
   
   return 0;
-
 }

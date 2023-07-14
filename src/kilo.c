@@ -41,6 +41,9 @@ void enableRawMode() {
   //  enabling raw mode.
   //BRKINT, INPCK, ISTRIP, and CS8 all come from <termios.h>.
 
+  //TIMEOUT READ()
+  raw.c_cc[VMIN] = 0;
+  raw.c_cc[VTIME] = 1;
 
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
@@ -48,14 +51,17 @@ void enableRawMode() {
 int main(){
   enableRawMode();
   
-  char c;
-  while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q'){
+  
+  while (1){
+    char c = '\0';
+    read(STDIN_FILENO, &c, 1); 
     // iscntrl() test if char is (non printable) control char.
     if(iscntrl(c)) {
       printf("%d\n", c);
     } else {
       printf("%d ('%c')\n", c, c);
-    }      
+    }
+    if(c == 'q') break;
   }
   
   return 0;

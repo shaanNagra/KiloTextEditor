@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <termios.h>
@@ -66,7 +67,9 @@ int main(){
   
   while (1){
     char c = '\0';
-    if (read(STDIN_FILENO, &c, 1) == -1)
+    //CHECK errno != EAGAIN as Cygwin returns -1 when read times out
+    //  with errno of EAGAIN
+    if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN)
       die("read"); 
     // iscntrl() test if char is (non printable) control char.
     if(iscntrl(c)) {

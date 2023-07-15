@@ -198,9 +198,9 @@ void abFree(struct abuf *ab) {
 void editorDrawRows(struct abuf *ab){
   int y;
   for (y = 0; y < E.screenrows-1; y++){
-    abAppend(ab, "~\r\n", 3);
+    abAppend(ab, "~\x1b[K\r\n", 6);
   }
-  abAppend(ab, "~", 1);
+  abAppend(ab, "~\x1b[K", 4);
 }
 
 /*
@@ -211,10 +211,7 @@ void editorDrawRows(struct abuf *ab){
 void editorRefreshScreen(){
   struct abuf ab = ABUF_INIT;
 
-  abAppend(&ab, "\x1b[?25l", 6); // hide cursor
-  // we write 4 bytes out to terminal. \1xb (escape char) followed by [ char.
-  // 2J is the J command (erase) with argument value 2 (whole screen).
-  abAppend(&ab, "\x1b[2J", 4);
+  abAppend(&ab, "\x1b[?25l", 6); // hide cursor 
   abAppend(&ab, "\x1b[H", 3);
 
   editorDrawRows(&ab);
@@ -233,6 +230,8 @@ void editorProcessKeypress(){
 
   switch (c) {
     case CTRL_KEY('q'):
+      // we write 4 bytes out to terminal. \1xb (escape char) followed by [ char.
+      // 2J is the J command (erase) with argument value 2 (whole screen).
       write(STDOUT_FILENO, "\x1b[2J", 4);
       write(STDOUT_FILENO, "\x1b[H", 3);
       exit(0);

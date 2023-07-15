@@ -4,22 +4,35 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
  
 
 /*** defines ***/
 
+
 /*
  * returns hex value of key modified by ctrl key
  */
 #define CTRL_KEY(k) ((k) & 0x1f)
 
+
 /*** data ***/
 
-struct termios orig_termios;
+
+struct editorConfig {
+  int screenrows;
+  int screencols;
+  struct termios orig_termios;
+};
+
+struct editorConfig E;
+
 
 /*** terminal ***/
+
 
 /*
  * Name: die
@@ -41,7 +54,7 @@ void die(const char *s){
  * enableRawMode.
  */
 void disableRawMode(){
-  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1) 
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) 
     die("tcsetattr");
 }
 
@@ -54,14 +67,14 @@ void disableRawMode(){
  */
 void enableRawMode() {
  
-  if (tcgetattr(STDIN_FILENO, &orig_termios) == -1)
+  if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1)
     die("tcgetattr");
 
   //atexit: comes from <stdlib.h>. Registers function to be called 
   //automatically when the program exits.
   atexit(disableRawMode);
 
-  struct termios raw = orig_termios;
+  struct termios raw = E.orig_termios;
   /*
    * Note: the flags that were disabled and what they did.
    * 
@@ -88,6 +101,12 @@ void enableRawMode() {
     die("tcsetattr");
 }
 
+/*
+ * Name: editorReadyKey
+ *
+ * Description:   
+ * 
+ */
 char editorReadKey(){
   int nread;
   char c;
@@ -99,15 +118,87 @@ char editorReadKey(){
   return c;
 }
 
-/*** output ***/
+/*
+ * Name: getCursorPosition
+ *
+ * Description: returns cursors row and column postion. used to calculate the
+ * terminal size manually if cannot be done any other way. 
+ */
+int getCursorPosition(int *rows, int *cols) {
+  char buf[32];
+  unsigned int i = 0;
 
-void editorDrawRows(){
-  int y;
-  for (y = 0; y < 24; y++){
-    write(STDOUT_FILENO, "~\r\n", 3);
+  if(write(STDOUT_FILENO, "\x1b[6n]", 4) != 4) return -1;
+
+  while (i < sizeof(buf) -1 ) {
+    if (read(STDIN_FILENO, &buf[i], 1) != 1){
+      break;
+    } 
+    if (buf[i] == 'R') {
+      break;
+    } 
+    i++;
   }
+  buf[i] = '\0';
+
+  if (buf[0] != '\x1b' || buf[1] != '[') return -1;
+  if (sscanf(&buf[2], "%d;%d", rows, cols) != 2) return -1;
+  return 0;
 }
 
+/*
+ * Name: getWindowSize
+ *
+ * Description: gets the number of columns and rows visible in the terminal
+ * window.
+ */
+int getWindowSize(int *rows, int *cols) {
+  struct winsize ws;
+
+  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0){
+    if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12){
+      return -1;
+    } 
+    return getCursorPosition(rows, cols); 
+  } else {
+    *cols = ws.ws_col;
+    *rows = ws.ws_row;
+    return 0;
+  }
+}
+/*** append buffer ***/
+
+struct abuf{
+  char *b;
+  int len;
+};
+
+#define ABUF_INIT {NULL, 0}
+
+void abAppend(struct abuf *ab, const char *s, int len){
+
+}
+
+/*** output ***/
+
+/*
+ * Name: editorDrawRows
+ * 
+ * Description: Draws the tilde at begining of each row.  
+ */
+void editorDrawRows(){
+  int y;
+  for (y = 0; y < E.screenrows-1; y++){
+    write(STDOUT_FILENO, "~\r\n", 3);
+  }
+  write(STDOUT_FILENO, "~", 1);
+}
+
+/*
+ * Name: editorRefreshScreen
+ * 
+ * Description: 
+ */
 void editorRefreshScreen(){
   /*
    * write() and STDOUT_FILENO come from <unistd.h>
@@ -138,9 +229,14 @@ void editorProcessKeypress(){
 
 /*** init ***/
 
+void initEditor(){
+  if (getWindowSize(&E.screenrows, &E.screencols) == -1 ) die("getWindowSize");
+}
+
 int main(){ 
   enableRawMode(); 
-  
+  initEditor();
+
   while (1){
     editorRefreshScreen();
     editorProcessKeypress();

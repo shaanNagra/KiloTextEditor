@@ -176,7 +176,16 @@ struct abuf{
 #define ABUF_INIT {NULL, 0}
 
 void abAppend(struct abuf *ab, const char *s, int len){
+  char *new = realloc(ab->b, ab->len + len);
 
+  if (new == NULL) return;
+  memcpy(&new[ab->len], s, len);
+  ab->b = new;
+  ab->len += len;
+}
+
+void abFree(struct abuf *ab) {
+  free(ab->b);
 }
 
 /*** output ***/
@@ -186,12 +195,12 @@ void abAppend(struct abuf *ab, const char *s, int len){
  * 
  * Description: Draws the tilde at begining of each row.  
  */
-void editorDrawRows(){
+void editorDrawRows(struct abuf *ab){
   int y;
   for (y = 0; y < E.screenrows-1; y++){
-    write(STDOUT_FILENO, "~\r\n", 3);
+    abAppend(ab, "~\r\n", 3);
   }
-  write(STDOUT_FILENO, "~", 1);
+  abAppend(ab, "~", 1);
 }
 
 /*
@@ -200,17 +209,21 @@ void editorDrawRows(){
  * Description: 
  */
 void editorRefreshScreen(){
-  /*
-   * write() and STDOUT_FILENO come from <unistd.h>
-   * we write 4 bytes out to terminal. \1xb (escape char) followed by [ char.
-   * 2J is the J command (erase) with argument value 2 (whole screen).
-   */
-  write(STDOUT_FILENO, "\x1b[2J", 4);
-  write(STDOUT_FILENO, "\x1b[H", 3);
+  struct abuf ab = ABUF_INIT;
 
-  editorDrawRows();
+  abAppend(&ab, "\x1b[?25l", 6); // hide cursor
+  // we write 4 bytes out to terminal. \1xb (escape char) followed by [ char.
+  // 2J is the J command (erase) with argument value 2 (whole screen).
+  abAppend(&ab, "\x1b[2J", 4);
+  abAppend(&ab, "\x1b[H", 3);
 
-  write(STDOUT_FILENO, "\x1b[H", 3);
+  editorDrawRows(&ab);
+
+  abAppend(&ab, "\x1b[H", 3);
+  abAppend(&ab, "\x1b[?25h", 6); // show cursor
+
+  write(STDOUT_FILENO, ab.b, ab.len);
+  abFree(&ab);
 }
 
 /*** input ***/
